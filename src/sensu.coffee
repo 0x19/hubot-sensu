@@ -268,17 +268,21 @@ module.exports = (robot) ->
         results = JSON.parse(body)
 
         for result,value of results
-          robot.emit 'slack.attachment', 
+          robot.emit 'slack.attachment',
              message: msg.message
              content:
               color: if value['check']['status'] == 2 then "#B81621" else "#EBB436"
-              title: value['client']['name']
+              title: value['check']['name'] + " -- " + value["client"]["name"]
               title_link: config.uchiva_url + "/#/client/Sensu/#{value['client']['name']}?check=#{value['check']['name']}"
               text: value['check']['output']
               fields: [
                {
                  title: "Occurrences"
                  value: value['occurrences']
+               },
+               {
+                 title: "Command"
+                 value: value['check']['command']
                }
               ]
 
