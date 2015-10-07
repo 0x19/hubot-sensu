@@ -5,8 +5,9 @@
 #   "moment": ">=1.6.0"
 #
 # Configuration:
-#   HUBOT_SENSU_API_UR - URL for the sensu api service.  http://sensu.yourdomain.com:4567
+#   HUBOT_SENSU_API_URL - URL for the sensu api service.  http://sensu.yourdomain.com:4567
 #   HUBOT_SENSU_DOMAIN - Domain to force on all clients.  Not used if blank/unset
+#   HUBOT_SENSU_UCHIVA_URL - URL for where UCHIVA is located at.
 #
 # Commands:
 #   hubot sensu info - show sensu api info
@@ -30,6 +31,7 @@
 
 config =
   sensu_api: process.env.HUBOT_SENSU_API_URL
+  uchiva_url: process.env.HUBOT_SENSU_UCHIVA_URL
 
 moment = require('moment')
 
@@ -39,6 +41,10 @@ module.exports = (robot) ->
     unless config.sensu_api
       robot.logger.error "HUBOT_SENSU_API_URL is unset"
       msg.send "Please set the HUBOT_SENSU_API_URL environment variable."
+      return
+    unless config.uchiva_url
+      robot.logger.error "HUBOT_SENSU_UCHIVA_URL is unset"
+      msg.send "Please set the HUBOT_SENSU_UCHIVA_URL environment variable."
       return
 
 ######################
@@ -260,19 +266,21 @@ module.exports = (robot) ->
           msg.send "Sensu says: #{err}"
           return
         results = JSON.parse(body)
-        output = []
+
         for result,value of results
-          if value['flapping']
-            flapping = ', flapping'
-          else
-            flapping = ''
-          output.push value['client'] + ' (' + value['check'] + flapping + ') - ' + value['output']
-        if output.length is 0
-          message = 'No events'
-          if client != ''
-            message = message + ' for ' + msg.match[1]
-          msg.send message
-        msg.send output.sort().join('\n')
+          robot.emit 'slack.attachment', 
+             message: msg.message
+             content:
+              color: if value['check']['status'] == 2 then "#B81621" else "#EBB436"
+              title: value['client']['name']
+              title_link: config.uchiva_url + "/#/client/Sensu/#{value['client']['name']}?check=#{value['check']['name']}"
+              text: value['check']['output']
+              fields: [
+               {
+                 title: "Occurrences"
+                 value: value['occurrences']
+               }
+              ]
 
   robot.respond /(?:sensu)? resolve event (.*)(?:\/)(.*)/i, (msg) ->
     validateVars
